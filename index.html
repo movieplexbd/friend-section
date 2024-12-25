@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Friend Requests & Friends List</title>
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f6f9;
+      color: #333;
+      display: flex;
+      justify-content: center;
+      min-height: 100vh;
+    }
+
+    .containers1{
+      width: 100%;
+      max-width: 1200px;
+      background-color: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+
+    .section-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #3b5998;
+      margin-bottom: 15px;
+      border-bottom: 3px solid #3b5998;
+      padding-bottom: 5px;
+    }
+
+    .friend-requests, .user-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .friend-card {
+      background-color: #fff;
+      border-radius: 8px;
+      width: 100%;
+      height: auto;
+      padding: 8px 15px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      text-align: left;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .friend-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .friend-card img {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      margin-right: 10px;
+      border: 2px solid #ddd;
+    }
+
+    .friend-card h3 {
+      font-size: 16px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .btn {
+      border: none;
+      padding: 5px 12px;
+      font-size: 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .accept-btn {
+      background-color: green;
+      color: #fff;
+    }
+
+    .accept-btn:hover {
+      background-color: #2d4373;
+    }
+
+    .sent-btn {
+      background-color: grey;
+      color: #fff;
+    }
+
+    .sent-btn:hover {
+      background-color: #555;
+    }
+
+    .friend-btn {
+      background-color: #007bff;
+      color: #fff;
+    }
+
+    .friend-btn:hover {
+      background-color: #0056b3;
+    }
+
+    .btn-icon {
+      font-size: 12px;
+    }
+
+    .message {
+      font-size: 12px;
+      color: #4CAF50;
+      margin-top: 5px;
+    }
+
+    @media (max-width: 768px) {
+      .friend-card {
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        align-items: flex-start;
+        padding: 15px;
+      }
+
+      .friend-card img {
+        margin-right: 0;
+        margin-bottom: 10px;
+      }
+
+      .btn {
+        align-self: flex-end;
+      }
+    }
+
+  </style>
+</head>
+<body>
+  <div class="containers1">
+    <div class="section-title">Friend Requests</div>
+    <div id="friendRequestsContainer" class="friend-requests">
+      <!-- Friend requests will be displayed here -->
+    </div>
+
+    <div class="section-title">Maybe you know</div>
+    <div id="userContainer" class="user-list"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getDatabase, ref, onValue, set, remove } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsz-82MDaibWnIBUpoykrZHyJW7UMedX8",
+      authDomain: "movies-bee24.firebaseapp.com",
+      databaseURL: "https://movies-bee24-default-rtdb.firebaseio.com",
+      projectId: "movies-bee24",
+      storageBucket: "movies-bee24.appspot.com",
+      messagingSenderId: "1080659811750",
+      appId: "1:1080659811750:web:c1ef7d4dacc3ab17edc367",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const auth = getAuth(app);
+
+    let userId = null;
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        userId = user.uid;
+
+        const friendRequestsContainer = document.getElementById("friendRequestsContainer");
+        const userContainer = document.getElementById("userContainer");
+
+        const requestsRef = ref(database, `users/${userId}/friendRequests`);
+
+        // Fetch friend requests
+        onValue(requestsRef, (snapshot) => {
+          const requests = snapshot.val();
+          friendRequestsContainer.innerHTML = "";
+          if (!requests) {
+            friendRequestsContainer.innerHTML = "<p>No friend requests.</p>";
+            return;
+          }
+          for (let requestId in requests) {
+            if (requests[requestId] === "pending") {
+              onValue(ref(database, `users/${requestId}`), (userSnap) => {
+                const user = userSnap.val();
+                const requestCard = document.createElement("div");
+                requestCard.className = "friend-card";
+                requestCard.innerHTML = `
+                  <img src="${user.profilePhoto}" alt="${user.name}" />
+                  <h3>${user.name}</h3>
+                  <button class="btn accept-btn" data-id="${requestId}">
+                    <i class="fas fa-user-plus btn-icon"></i>Accept
+                  </button>
+                `;
+                friendRequestsContainer.appendChild(requestCard);
+
+                requestCard.querySelector(".accept-btn").addEventListener("click", () => {
+                  set(ref(database, `users/${userId}/friends/${requestId}`), "accepted");
+                  remove(ref(database, `users/${userId}/friendRequests/${requestId}`));
+                });
+              });
+            } else if (requests[requestId] === "accepted") {
+              onValue(ref(database, `users/${requestId}`), (userSnap) => {
+                const user = userSnap.val();
+                const requestCard = document.createElement("div");
+                requestCard.className = "friend-card";
+                requestCard.innerHTML = `
+                  <img src="${user.profilePhoto}" alt="${user.name}" />
+                  <h3>${user.name}</h3>
+                  <button class="btn sent-btn" disabled>Friend</button>
+                `;
+                friendRequestsContainer.appendChild(requestCard);
+              });
+            }
+          }
+        });
+
+        // Display all users except logged-in user
+        onValue(ref(database, "users"), (snapshot) => {
+          const users = snapshot.val();
+          userContainer.innerHTML = "";
+          for (let id in users) {
+            if (id !== userId) {
+              const user = users[id];
+              const userCard = document.createElement("div");
+              userCard.className = "friend-card";
+              userCard.innerHTML = `
+                <div class="img-nam">
+                  <img src="${user.profilePhoto}"  />
+                  <h3>${user.name}</h3>
+                </div>
+                <button class="btn send-request-btn" data-id="${id}">
+                  <i class="fas fa-user-plus btn-icon"></i>Add friend
+                </button>
+              `;
+              userContainer.appendChild(userCard);
+
+              // Check if already friends
+              onValue(ref(database, `users/${userId}/friends/${id}`), (friendSnap) => {
+                if (friendSnap.exists()) {
+                  userCard.querySelector(".send-request-btn").disabled = true;
+                  userCard.querySelector(".send-request-btn").innerText = "Friend";
+                }
+              });
+
+              // Send friend request
+              userCard.querySelector(".send-request-btn").addEventListener("click", () => {
+                const button = userCard.querySelector(".send-request-btn");
+
+                // Send the friend request to Firebase
+                set(ref(database, `users/${id}/friendRequests/${userId}`), "pending").then(() => {
+                  // Update the UI to reflect that the request has been sent
+                  button.innerHTML = '<i class="fas fa-user-plus btn-icon"></i> Request Sent';
+                  button.disabled = true; // Disable the button
+                }).catch((error) => {
+                  console.error("Error sending friend request: ", error);
+                });
+              });
+            }
+          }
+        });
+      }
+    });
+  </script>
+  </body>
+  </html>
+  
